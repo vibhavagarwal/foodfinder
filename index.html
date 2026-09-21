@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Atlanta Dish Finder</title>
+  <title>Dish Finder</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -34,7 +34,7 @@
     <!-- Header -->
     <header class="text-center mb-10">
       <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-wide uppercase bg-amber-50 text-amber-800 border border-amber-200/60 mb-3 shadow-sm">
-        Curated Metro Atlanta Eats
+        Curated Local Eats, Any City
       </span>
       <h1 class="text-4xl font-extrabold tracking-tight text-stone-900 sm:text-5xl">
         Dish Finder
@@ -54,6 +54,25 @@
           <input id="apiKey" type="password" placeholder="Paste your API key starting with AIza..." class="w-full text-sm bg-stone-50/50 hover:bg-white text-stone-800 pl-3.5 pr-10 py-2.5 border border-stone-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 transition">
         </div>
         <p class="text-[11px] text-stone-400 mt-1.5">Stored securely in your local browser storage. Never transmitted elsewhere.</p>
+      </div>
+
+      <!-- Location & Radius -->
+      <div class="mb-5 pb-5 border-b border-stone-100">
+        <label class="block text-[11px] font-bold text-stone-400 uppercase tracking-wider mb-1.5">Where are you searching?</label>
+        <div class="flex flex-col sm:flex-row gap-2.5">
+          <input id="locationInput" type="text" placeholder="e.g. Decatur, GA or 30030" class="flex-1 text-sm text-stone-800 px-4 py-2.5 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 shadow-sm transition placeholder:text-stone-400">
+          <button id="useLocationBtn" type="button" onclick="useMyLocation()" class="inline-flex items-center justify-center gap-1.5 bg-stone-50 hover:bg-stone-100 border border-stone-200 text-stone-700 text-sm font-semibold px-4 py-2.5 rounded-xl transition shrink-0">
+            <span>📍 Use my location</span>
+          </button>
+          <select id="radiusSelect" class="text-sm text-stone-700 bg-stone-50/50 border border-stone-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 shrink-0">
+            <option value="1">Within 1 mile</option>
+            <option value="3">Within 3 miles</option>
+            <option value="5" selected>Within 5 miles</option>
+            <option value="10">Within 10 miles</option>
+            <option value="25">Within 25 miles</option>
+            <option value="50">Within 50 miles</option>
+          </select>
+        </div>
       </div>
 
       <!-- Search Input -->
@@ -85,7 +104,7 @@
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
         </svg>
-        <span id="loadingText">Gathering fresh culinary intel across metro Atlanta...</span>
+        <span id="loadingText">Gathering fresh culinary intel...</span>
       </div>
       <div class="space-y-3 opacity-60 animate-pulse">
         <div class="h-28 bg-stone-200/70 rounded-2xl"></div>
@@ -102,14 +121,68 @@
   </div>
 
   <script>
+    let lastSearchLocation = '';
+
     document.getElementById('apiKey').value = localStorage.getItem('gemini_api_key') || '';
     document.getElementById('apiKey').addEventListener('input', (e) => {
       localStorage.setItem('gemini_api_key', e.target.value.trim());
     });
 
+    document.getElementById('locationInput').value = localStorage.getItem('df_location') || '';
+    document.getElementById('locationInput').addEventListener('input', (e) => {
+      localStorage.setItem('df_location', e.target.value.trim());
+    });
+
+    document.getElementById('radiusSelect').value = localStorage.getItem('df_radius') || '5';
+    document.getElementById('radiusSelect').addEventListener('change', (e) => {
+      localStorage.setItem('df_radius', e.target.value);
+    });
+
+    function useMyLocation() {
+      const btn = document.getElementById('useLocationBtn');
+      const locationInput = document.getElementById('locationInput');
+
+      if (!navigator.geolocation) {
+        alert('Geolocation is not supported by your browser.');
+        return;
+      }
+
+      const originalLabel = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span>Locating…</span>';
+
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14`);
+          const data = await res.json();
+          const addr = data.address || {};
+          const label = [
+            addr.suburb || addr.neighbourhood || addr.city_district,
+            addr.city || addr.town || addr.village || addr.county,
+            addr.state
+          ].filter(Boolean).join(', ') || data.display_name || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+
+          locationInput.value = label;
+        } catch (e) {
+          locationInput.value = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+        } finally {
+          localStorage.setItem('df_location', locationInput.value);
+          btn.disabled = false;
+          btn.innerHTML = originalLabel;
+        }
+      }, (err) => {
+        alert(`Could not get your location: ${err.message}`);
+        btn.disabled = false;
+        btn.innerHTML = originalLabel;
+      });
+    }
+
     async function findDish() {
       const apiKey = document.getElementById('apiKey').value.trim();
       const dish = document.getElementById('dishInput').value.trim();
+      const location = document.getElementById('locationInput').value.trim();
+      const radiusMiles = document.getElementById('radiusSelect').value;
       const bypassCache = document.getElementById('bypassCache').checked;
       const loadingEl = document.getElementById('loading');
       const errorEl = document.getElementById('errorBanner');
@@ -119,6 +192,10 @@
         alert('Please paste your Google AI Studio API key first.');
         return;
       }
+      if (!location) {
+        alert('Please enter a location or use your current location.');
+        return;
+      }
       if (!dish) {
         alert('Please enter a dish craving.');
         return;
@@ -126,8 +203,9 @@
 
       errorEl.classList.add('hidden');
       errorEl.innerText = '';
+      lastSearchLocation = location;
 
-      const cacheKey = `dish_v6_${dish.toLowerCase().replace(/\s+/g, '_')}`;
+      const cacheKey = `dish_v7_${location.toLowerCase().replace(/\s+/g, '_')}_${radiusMiles}mi_${dish.toLowerCase().replace(/\s+/g, '_')}`;
       if (!bypassCache) {
         const cachedData = localStorage.getItem(cacheKey);
         if (cachedData) {
@@ -137,26 +215,29 @@
       }
 
       loadingEl.classList.remove('hidden');
+      document.getElementById('loadingText').innerText = `Gathering fresh culinary intel within ${radiusMiles} miles of ${location}...`;
       resultsEl.innerHTML = '';
 
       const currentYear = new Date().getFullYear();
-      const systemPrompt = `You are an expert local food editor and researcher for the Atlanta metro area.
-Your task is to recommend verified standout spots across the entire metro area (including Atlanta intown, Decatur, Buford Hwy, Duluth, Alpharetta, Sandy Springs, Marietta, Woodstock, etc.) for the specific dish requested.
+      const systemPrompt = `You are an expert local food editor and researcher covering the area within ${radiusMiles} miles of ${location}.
+Your task is to recommend verified standout spots strictly within that radius for the specific dish requested.
 
 CRITICAL OPERATIONAL RULES:
-1. Operational check: Every single restaurant MUST BE CURRENTLY OPEN AND OPERATING in ${currentYear}. If a spot has permanently closed (e.g. Ghee Indian Kitchen, shuttered venues), DO NOT include it. Verify that it is currently active.
-2. Multi-location handling: Identify all active locations in the metro area (such as Decatur, Alpharetta, Sandy Springs, Marietta) and include them inside the "locations" array.
-3. Freshness: Favor reviews, menus, and discussions from the past 12 months.
-4. Categories and strict quota:
+1. Distance constraint: Every single restaurant MUST be located within approximately ${radiusMiles} miles of ${location}. Do NOT include spots further away, even if famous.
+2. Operational check: Every single restaurant MUST BE CURRENTLY OPEN AND OPERATING in ${currentYear}. If a spot has permanently closed, DO NOT include it. Verify that it is currently active.
+3. Multi-location handling: If a restaurant has multiple locations, only include the locations that fall within ${radiusMiles} miles of ${location} inside the "locations" array.
+4. Freshness: Favor reviews, menus, and discussions from the past 12 months.
+5. Categories and strict quota:
    - You MUST provide EXACTLY 3 distinct recommendations for EACH of the three categories (3 for "The Street Pick", 3 for "The Crowd Favorite", and 3 for "The Critic Pick"), yielding exactly 9 spots total.
-   - "The Street Pick": Highest community consensus on r/Atlanta or r/AtlantaEats.
+   - "The Street Pick": Highest community consensus on local subreddits or diner forums for this area.
    - "The Crowd Favorite": High review volume and consistent praise on recent Google reviews.
-   - "The Critic Pick": Respected spots highlighted by Eater Atlanta, AJC, Atlanta Magazine, or Michelin Guide. If no critic piece exists on this exact dish, recommend a celebrated, open critic favorite specializing in this regional cuisine.
+   - "The Critic Pick": Respected spots highlighted by local press or well-known food critics/guides covering this area. If no critic piece exists on this exact dish, recommend a celebrated, open critic favorite specializing in this regional cuisine.
+   - If fewer than 9 qualifying spots exist within ${radiusMiles} miles, return as many verified, in-radius spots as you can find rather than including out-of-radius spots to hit the quota.
 
 Return ONLY a valid JSON array of objects matching the schema.`;
 
       const requestBody = {
-        contents: [{ parts: [{ text: `Find the best "${dish}" in the Atlanta metro area. You MUST provide EXACTLY 3 distinct spots for EACH category: exactly 3 for Street Pick, exactly 3 for Crowd Favorite, and exactly 3 for Critic Pick (9 total spots). Ensure every spot is verified open today.` }] }],
+        contents: [{ parts: [{ text: `Find the best "${dish}" within ${radiusMiles} miles of ${location}. You MUST provide EXACTLY 3 distinct spots for EACH category: exactly 3 for Street Pick, exactly 3 for Crowd Favorite, and exactly 3 for Critic Pick (9 total spots), all within the specified radius. Ensure every spot is verified open today.` }] }],
         systemInstruction: { parts: [{ text: systemPrompt }] },
         tools: [{ googleSearch: {} }],
         generationConfig: {
@@ -223,7 +304,7 @@ Return ONLY a valid JSON array of objects matching the schema.`;
         {
           id: "The Street Pick",
           title: "The Street Pick",
-          subtitle: "Unfiltered consensus from r/Atlanta and local diner forums",
+          subtitle: "Unfiltered consensus from local subreddits and diner forums",
           accentColor: "bg-orange-500",
           tagBg: "bg-orange-50",
           tagText: "text-orange-900 border-orange-200"
@@ -239,7 +320,7 @@ Return ONLY a valid JSON array of objects matching the schema.`;
         {
           id: "The Critic Pick",
           title: "The Critic Pick",
-          subtitle: "Acclaimed by Eater Atlanta, AJC, and regional dining guides",
+          subtitle: "Acclaimed by local press and regional dining guides",
           accentColor: "bg-emerald-600",
           tagBg: "bg-emerald-50",
           tagText: "text-emerald-900 border-emerald-200"
@@ -276,7 +357,7 @@ Return ONLY a valid JSON array of objects matching the schema.`;
 
           if (locs.length === 1) {
             const loc = locs[0];
-            const displayLabel = loc.address || loc.neighborhood || 'Atlanta Metro';
+            const displayLabel = loc.address || loc.neighborhood || lastSearchLocation || 'Nearby';
             const query = `${spot.name} ${displayLabel}`;
             const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
             locationHtml = `
@@ -297,14 +378,14 @@ Return ONLY a valid JSON array of objects matching the schema.`;
                 ${chips}
               </div>`;
           } else {
-            const queryTarget = `${spot.name} Atlanta`;
+            const queryTarget = `${spot.name} ${lastSearchLocation}`;
             const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(queryTarget)}`;
-            locationHtml = `<a href="${mapsUrl}" target="_blank" class="text-xs text-stone-500 hover:text-stone-800 transition">📍 Find Atlanta locations on Google Maps</a>`;
+            locationHtml = `<a href="${mapsUrl}" target="_blank" class="text-xs text-stone-500 hover:text-stone-800 transition">📍 Find locations on Google Maps</a>`;
           }
 
           const whyText = spot.why || spot.why_it_hits || spot.reason || "Consensus favorite for this dish.";
           const dinerText = spot.what_people_say || spot.diner_consensus || spot.word_on_the_street || "Consistently recommended by local diners.";
-          const sourceText = spot.source || "Atlanta community consensus";
+          const sourceText = spot.source || "Local community consensus";
 
           const card = document.createElement('article');
           card.className = 'bg-white rounded-2xl border border-stone-200/70 p-5 shadow-[0_2px_12px_-2px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_-4px_rgba(0,0,0,0.06)] hover:border-stone-300 transition duration-200 space-y-3.5';
@@ -347,6 +428,10 @@ Return ONLY a valid JSON array of objects matching the schema.`;
     }
 
     document.getElementById('dishInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') findDish();
+    });
+
+    document.getElementById('locationInput').addEventListener('keypress', (e) => {
       if (e.key === 'Enter') findDish();
     });
   </script>
