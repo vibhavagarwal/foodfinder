@@ -73,6 +73,6 @@ MIT — see [LICENSE](LICENSE).
 
 ## How this project was built
 
-I set the product direction: the three-lens category framing, what "verified open" should mean, the bring-your-own-key approach, the location/radius UX, and which of the AI's suggestions to accept, reject, or change. AI coding agents (Claude Code) did the implementation — the location and radius search feature, two service-worker bugfixes (a stale-cache issue and the switch to a network-first strategy), and this documentation.
+I set the product direction: the three-lens category framing, what "verified open" should mean, the bring-your-own-key approach, the location/radius UX, and which of the AI's suggestions to accept, reject, or change. Two AI coding agents did the implementation at different stages: Google Gemini built the original version — the core dish-search prompt, category framing, and card UI. Claude Code added the location and radius search feature, two service-worker bugfixes (a stale-cache issue and the switch to a network-first strategy), and this documentation.
 
 To keep that reliable, each change was scoped as its own bounded task, tested by actually running the app in a browser rather than just reading the diff, and committed individually with a rationale in the message — so the git history reads as a record of what changed and why, not one undifferentiated drop. I reviewed and accepted every change before it shipped; nothing here merged without me looking at it first.
