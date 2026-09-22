@@ -2,10 +2,11 @@
 
 Find verified, currently-open spots for one specific dish, near any location you pick — not a general restaurant browser, a dish-specific one.
 
-**Live demo:** https://vibhavagarwal.github.io/foodfinder/index.html
+![Dish Finder — location, radius, and dish search controls](docs/screenshot-controls.png)
 
-![Dish Finder — location and radius search with sample results](docs/screenshot.png)
-*Illustrative screenshot — the location/dish/results shown above are mocked sample data for this demo image, not a live search.*
+![Dish Finder — results grouped into Street Pick, Crowd Favorite, and Critic Pick](docs/screenshot-results.png)
+
+*Illustrative screenshots — the location, dish, and results shown above are mocked sample data captured for this README, not a live search.*
 
 ## The problem
 
@@ -20,7 +21,7 @@ Find verified, currently-open spots for one specific dish, near any location you
 
 ## Demo
 
-The live URL above is the real thing — you'll need your own free Google AI Studio API key to run a search (see Setup). The screenshot embedded in this README uses mocked results instead of a real query, so a reviewer without a key can still see the actual UI and card layout at a glance.
+The screenshots above use mocked results instead of a real query, so you can see the actual UI and card layout without needing an API key first. To run it for real, clone it and supply your own key — see Setup below.
 
 ## Key decisions
 
